@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>ToDo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="ToDo" />
+<meta name="theme-color" content="#f0eee9" />
+<style>
+  html, body {
+    margin: 0; padding: 0; background: #f0eee9;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    color: #1a1820;
+    -webkit-font-smoothing: antialiased;
+    height: 100%;
+    overscroll-behavior-y: none;
+  }
+  * { box-sizing: border-box; }
+  #root { width: 100%; height: 100vh; height: 100dvh; }
+
+  /* sync status pill */
+  .sync-pill {
+    position: fixed; top: 12px; right: 12px; z-index: 1000;
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 999px;
+    font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    background: rgba(255,255,255,0.85); backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 0.5px solid rgba(20,15,30,0.10);
+    color: #6b6478;
+    transition: opacity 0.3s;
+  }
+  .sync-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #888;
+  }
+  .sync-pill.synced .dot { background: oklch(0.65 0.16 165); }
+  .sync-pill.saving .dot { background: oklch(0.70 0.18 80); animation: pulse 1s infinite; }
+  .sync-pill.offline .dot { background: oklch(0.65 0.20 25); }
+  .sync-pill.no-key .dot { background: #aaa; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  /* gate (no key entered) */
+  .gate {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    background: #f0eee9;
+    padding: 24px;
+  }
+  .gate-card {
+    background: #fff; border-radius: 16px;
+    padding: 32px; max-width: 400px; width: 100%;
+    border: 0.5px solid rgba(20,15,30,0.10);
+    box-shadow: 0 4px 24px rgba(20,15,30,0.06);
+  }
+  .gate h1 {
+    margin: 0 0 8px; font-size: 22px; font-weight: 600;
+    color: #1a1820;
+  }
+  .gate p {
+    margin: 0 0 20px; font-size: 13px; color: #6b6478; line-height: 1.6;
+  }
+  .gate input {
+    width: 100%; padding: 12px 14px;
+    border: 1px solid rgba(20,15,30,0.15); border-radius: 10px;
+    font-size: 16px; font-family: inherit;
+    background: #fafaf7;
+    outline: none;
+  }
+  .gate input:focus {
+    border-color: oklch(0.55 0.18 295);
+    background: #fff;
+  }
+  .gate button {
+    margin-top: 12px; width: 100%;
+    padding: 12px; border: none; border-radius: 10px;
+    background: oklch(0.55 0.18 295); color: #fff;
+    font-size: 15px; font-weight: 600; font-family: inherit;
+    cursor: pointer;
+  }
+  .gate-hint {
+    margin-top: 14px; font-size: 11px; color: #9b94a8;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  /* responsive: mobile vs desktop */
+  .desktop-only { display: block; }
+  .mobile-only { display: none; }
+  @media (max-width: 820px) {
+    .desktop-only { display: none; }
+    .mobile-only { display: block; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="data.js"></script>
+<script src="sync.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="app-a.jsx"></script>
+<script type="text/babel" src="app-a-views.jsx"></script>
+<script type="text/babel" src="app-a-gantt.jsx"></script>
+<script type="text/babel" src="app-b.jsx"></script>
+<script type="text/babel" src="app-b-views.jsx"></script>
+<script type="text/babel" src="app-b-gantt.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="iphone-app.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+
+// ─── Detect mobile ──────────────────────────────────────────────
+function useIsMobile() {
+  const [m, setM] = React.useState(() => window.innerWidth <= 820);
+  React.useEffect(() => {
+    const onR = () => setM(window.innerWidth <= 820);
+    window.addEventListener('resize', onR);
+    return () => window.removeEventListener('resize', onR);
+  }, []);
+  return m;
+}
+
+// ─── Sync status pill ───────────────────────────────────────────
+function SyncPill({ status }) {
+  const labels = {
+    'synced':  { t: '同期済み',  cls: 'synced' },
+    'saving':  { t: '保存中…',  cls: 'saving' },
+    'loading': { t: '読込中…',  cls: 'saving' },
+    'offline': { t: 'オフライン', cls: 'offline' },
+    'no-key':  { t: 'キーなし',  cls: 'no-key' },
+  };
+  const s = labels[status] || labels.synced;
+  return (
+    <div className={`sync-pill ${s.cls}`}>
+      <div className="dot" />
+      <span>{s.t}</span>
+    </div>
+  );
+}
+
+// ─── Gate (no key) ──────────────────────────────────────────────
+function KeyGate() {
+  const [val, setVal] = React.useState('');
+  const submit = () => {
+    if (!val) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('key', val);
+    window.location.href = url.toString();
+  };
+  return (
+    <div className="gate">
+      <div className="gate-card">
+        <h1>ToDo</h1>
+        <p>続行するにはアクセスキーを入力してください。<br/>Enter your access key to continue.</p>
+        <input type="password" value={val}
+          placeholder="key"
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+          autoFocus />
+        <button onClick={submit}>続行 / Continue</button>
+        <div className="gate-hint">URL: ?key=…</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Desktop app shell ──────────────────────────────────────────
+function DesktopApp({ tasks, setTasks, view, setView, variants, setVariants, density, showSidebar, dark }) {
+  const onTaskUpdate = React.useCallback((id, patch) => {
+    setTasks(ts => ts.map(t => t.id === id ? { ...t, ...patch } : t));
+  }, [setTasks]);
+
+  const variant = variants[view] || 'a';
+  const setVariant = (v) => setVariants(s => ({ ...s, [view]: v }));
+
+  const titleMap = {
+    list: { t: 'タスク一覧', s: 'TASK LIST' },
+    dash: { t: 'ダッシュボード', s: 'DASHBOARD · OVERVIEW' },
+    gantt: { t: 'ガントチャート', s: 'GANTT · TIMELINE' },
+    network: { t: 'PERTネットワーク', s: 'NETWORK · DEPENDENCIES' },
+  };
+
+  const renderView = () => {
+    const V = variant === 'a' ? {
+      list: window.ListViewA, dash: window.DashViewA,
+      gantt: window.GanttViewA, network: window.NetworkViewA,
+    } : {
+      list: window.ListViewB, dash: window.DashViewB,
+      gantt: window.GanttViewB, network: window.NetworkViewB,
+    };
+    if (view === 'list') return <V.list tasks={tasks} density={density} />;
+    if (view === 'dash') return <V.dash tasks={tasks} />;
+    if (view === 'gantt') return <V.gantt tasks={tasks} density={density} onTaskUpdate={onTaskUpdate} />;
+    if (view === 'network') return <V.network tasks={tasks} />;
+  };
+
+  return (
+    <div style={{
+      display: 'flex', height: '100%', width: '100%',
+      background: window.A_TOKENS.bg,
+      filter: dark ? 'invert(0.92) hue-rotate(180deg)' : 'none',
+    }}>
+      <window.SidebarA activeView={view} setView={setView}
+        density={density} showSidebar={showSidebar} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <window.ToolbarA title={titleMap[view].t} sub={titleMap[view].s}
+          density={density} setDensity={() => {}}
+          dragHint={view === 'gantt'}
+          designVariant={variant} setDesignVariant={setVariant} />
+        {renderView()}
+      </div>
+    </div>
+  );
+}
+
+// ─── Mobile shell (uses IPhoneApp logic but full-bleed) ─────────
+function MobileApp({ tasks, setTasks }) {
+  // We embed the existing IPhoneApp but pass tasks via a prop bridge.
+  // Since IPhoneApp uses window.SAMPLE_TASKS internally, we monkey-patch:
+  // simpler: render a thin clone that passes the synced tasks.
+  return <window.IPhoneAppSynced tasks={tasks} setTasks={setTasks} />;
+}
+
+// ─── Main ───────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "dark": false,
+  "density": "regular",
+  "showSidebar": true
+}/*EDITMODE-END*/;
+
+function App() {
+  const isMobile = useIsMobile();
+  const [t, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
+
+  const [loaded, setLoaded] = React.useState(false);
+  const [syncStatus, setSyncStatus] = React.useState('loading');
+  const [tasks, setTasks] = React.useState(window.SAMPLE_TASKS);
+  const [view, setView] = React.useState('list');
+  const [variants, setVariants] = React.useState({ list: 'a', dash: 'a', gantt: 'a', network: 'a' });
+
+  // Load on mount
+  React.useEffect(() => {
+    if (!window.AppSync.hasKey) {
+      setSyncStatus('no-key');
+      setLoaded(true);
+      return;
+    }
+    (async () => {
+      const r = await window.AppSync.loadInitial();
+      if (r.state) {
+        if (r.state.tasks) setTasks(r.state.tasks);
+        if (r.state.view) setView(r.state.view);
+        if (r.state.variants) setVariants(r.state.variants);
+      }
+      setSyncStatus(r.source === 'remote' ? 'synced' : (r.source === 'local' ? 'offline' : 'synced'));
+      setLoaded(true);
+    })();
+    window.AppSync.listen((kind) => {
+      if (kind === 'synced') setSyncStatus('synced');
+      else if (kind === 'offline') setSyncStatus('offline');
+    });
+  }, []);
+
+  // Save on change
+  React.useEffect(() => {
+    if (!loaded) return;
+    if (!window.AppSync.hasKey) return;
+    setSyncStatus('saving');
+    window.AppSync.queuePush({ tasks, view, variants });
+  }, [tasks, view, variants, loaded]);
+
+  if (!window.AppSync.hasKey) {
+    return <KeyGate />;
+  }
+  if (!loaded) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100%', color: '#9b94a8', fontSize: 13,
+      }}>読込中…</div>
+    );
+  }
+
+  return (
+    <>
+      <SyncPill status={syncStatus} />
+      {isMobile ? (
+        <MobileApp tasks={tasks} setTasks={setTasks} />
+      ) : (
+        <DesktopApp
+          tasks={tasks} setTasks={setTasks}
+          view={view} setView={setView}
+          variants={variants} setVariants={setVariants}
+          density={t.density} showSidebar={t.showSidebar} dark={t.dark} />
+      )}
+
+      {!isMobile && (
+        <window.TweaksPanel>
+          <window.TweakSection label="Theme" />
+          <window.TweakToggle label="ダークモード" value={t.dark}
+            onChange={(v) => setTweak('dark', v)} />
+
+          <window.TweakSection label="Density" />
+          <window.TweakRadio label="情報密度" value={t.density}
+            options={['compact', 'regular', 'comfy']}
+            onChange={(v) => setTweak('density', v)} />
+
+          <window.TweakSection label="Layout" />
+          <window.TweakToggle label="サイドバー表示" value={t.showSidebar}
+            onChange={(v) => setTweak('showSidebar', v)} />
+        </window.TweaksPanel>
+      )}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

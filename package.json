@@ -1,0 +1,9 @@
+{
+  "name": "todo-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Personal ToDo app with Vercel KV sync",
+  "engines": {
+    "node": ">=18"
+  }
+}

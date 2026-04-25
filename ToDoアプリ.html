@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>ToDoアプリ — 2案デザイン</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  html, body {
+    margin: 0; padding: 0; background: #f0eee9;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    color: #1a1820;
+    -webkit-font-smoothing: antialiased;
+  }
+  * { box-sizing: border-box; }
+  #root { width: 100%; min-height: 100vh; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="data.js"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="macos-window.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="app-a.jsx"></script>
+<script type="text/babel" src="app-a-views.jsx"></script>
+<script type="text/babel" src="app-a-gantt.jsx"></script>
+<script type="text/babel" src="app-b.jsx"></script>
+<script type="text/babel" src="app-b-views.jsx"></script>
+<script type="text/babel" src="app-b-gantt.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="iphone-app.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "dark": false,
+  "density": "regular",
+  "showSidebar": true,
+  "defaultView": "list",
+  "showCompare": false
+}/*EDITMODE-END*/;
+
+// ────────────────────────────────────────────────────────────────
+// AppA — "Studio": sidebar + 4 views, per-view A/B variant
+// ────────────────────────────────────────────────────────────────
+function AppA({ density, showSidebar, dark }) {
+  const [view, setView] = React.useState(TWEAK_DEFAULTS.defaultView);
+  const [variants, setVariants] = React.useState({
+    list: 'a', dash: 'a', gantt: 'a', network: 'a',
+  });
+  const [tasks, setTasks] = React.useState(window.SAMPLE_TASKS);
+  const onTaskUpdate = React.useCallback((id, patch) => {
+    setTasks(ts => ts.map(t => t.id === id ? { ...t, ...patch } : t));
+  }, []);
+
+  const variant = variants[view];
+  const setVariant = (v) => setVariants(s => ({ ...s, [view]: v }));
+
+  const titleMap = {
+    list: { t: 'タスク一覧', s: 'TASK LIST' },
+    dash: { t: 'ダッシュボード', s: 'DASHBOARD · OVERVIEW' },
+    gantt: { t: 'ガントチャート', s: 'GANTT · TIMELINE' },
+    network: { t: 'PERTネットワーク', s: 'NETWORK · DEPENDENCIES' },
+  };
+
+  const renderView = () => {
+    if (variant === 'a') {
+      if (view === 'list') return <window.ListViewA tasks={tasks} density={density} />;
+      if (view === 'dash') return <window.DashViewA tasks={tasks} />;
+      if (view === 'gantt') return <window.GanttViewA tasks={tasks} density={density} onTaskUpdate={onTaskUpdate} />;
+      if (view === 'network') return <window.NetworkViewA tasks={tasks} />;
+    } else {
+      // B variant — render B's view inside A's chrome (no TabBarB since A's sidebar handles nav)
+      if (view === 'list') return <window.ListViewB tasks={tasks} density={density} />;
+      if (view === 'dash') return <window.DashViewB tasks={tasks} />;
+      if (view === 'gantt') return <window.GanttViewB tasks={tasks} density={density} onTaskUpdate={onTaskUpdate} />;
+      if (view === 'network') return <window.NetworkViewB tasks={tasks} />;
+    }
+  };
+
+  return (
+    <div style={{
+      display: 'flex', height: '100%',
+      background: window.A_TOKENS.bg,
+      filter: dark ? 'invert(0.92) hue-rotate(180deg)' : 'none',
+    }}>
+      <window.SidebarA activeView={view} setView={setView}
+        density={density} showSidebar={showSidebar} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <window.ToolbarA title={titleMap[view].t} sub={titleMap[view].s}
+          density={density} setDensity={() => {}}
+          dragHint={view === 'gantt'}
+          designVariant={variant} setDesignVariant={setVariant} />
+        {renderView()}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────
+// Mac Window wrapper around an app
+// ────────────────────────────────────────────────────────────────
+function MacShell({ title, children, accent }) {
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      background: '#fff',
+      borderRadius: 12,
+      overflow: 'hidden',
+      boxShadow: '0 8px 32px rgba(20,15,30,0.15), 0 1px 0 rgba(255,255,255,0.5) inset',
+      border: '1px solid rgba(20,15,30,0.10)',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* title bar */}
+      <div style={{
+        height: 36, flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '0 12px',
+        background: 'linear-gradient(180deg, #f7f5f1, #ecebe6)',
+        borderBottom: '1px solid rgba(20,15,30,0.10)',
+        position: 'relative',
+      }}>
+        {/* traffic lights */}
+        <div style={{ display: 'flex', gap: 7 }}>
+          {['#ff5f57', '#febc2e', '#28c840'].map((c, i) => (
+            <div key={i} style={{ width: 12, height: 12, borderRadius: '50%',
+              background: c, boxShadow: 'inset 0 0 0 0.5px rgba(0,0,0,0.1)' }} />
+          ))}
+        </div>
+        {/* center title */}
+        <div style={{
+          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+          fontSize: 13, fontWeight: 600, color: '#3a3540',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: accent }} />
+          {title}
+        </div>
+      </div>
+      {/* body */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────
+// Main canvas
+// ────────────────────────────────────────────────────────────────
+function App() {
+  const [t, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
+
+  // keep both shells the same size
+  const W = 1340, H = 840;
+
+  return (
+    <>
+      <window.DesignCanvas>
+        <window.DCSection
+          id="todo-app"
+          title="ToDoアプリ — Microsoft Project相当"
+          subtitle="2案・Mac優先・パープル系・プロフェッショナルミニマル">
+
+          <window.DCArtboard id="main" label="Mac · パーソナル Q2 — A/B 切替対応" width={W} height={H}>
+            <MacShell title="パーソナル Q2" accent="oklch(0.55 0.18 295)">
+              <AppA density={t.density} showSidebar={t.showSidebar} dark={t.dark} />
+            </MacShell>
+          </window.DCArtboard>
+
+          <window.DCArtboard id="iphone" label="iPhone · パーソナル Q2" width={460} height={920}>
+            <div style={{
+              width: '100%', height: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent',
+            }}>
+              <window.IOSDevice width={402} height={874} dark={false}>
+                <window.IPhoneApp />
+              </window.IOSDevice>
+            </div>
+          </window.DCArtboard>
+
+        </window.DCSection>
+      </window.DesignCanvas>
+
+      <window.TweaksPanel>
+        <window.TweakSection label="Theme" />
+        <window.TweakToggle label="ダークモード" value={t.dark}
+          onChange={(v) => setTweak('dark', v)} />
+
+        <window.TweakSection label="Density" />
+        <window.TweakRadio label="情報密度" value={t.density}
+          options={['compact', 'regular', 'comfy']}
+          onChange={(v) => setTweak('density', v)} />
+
+        <window.TweakSection label="Layout" />
+        <window.TweakToggle label="サイドバー表示" value={t.showSidebar}
+          onChange={(v) => setTweak('showSidebar', v)} />
+
+        <window.TweakSection label="初期ビュー" />
+        <window.TweakSelect label="起動時のビュー" value={t.defaultView}
+          options={[
+            { value: 'list', label: 'リスト' },
+            { value: 'dash', label: 'ダッシュボード' },
+            { value: 'gantt', label: 'ガント' },
+            { value: 'network', label: 'PERT' },
+          ]}
+          onChange={(v) => setTweak('defaultView', v)} />
+      </window.TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
