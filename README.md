@@ -9,6 +9,9 @@ Mac/iPhoneで同じデータを使えるToDoアプリ。Vercel KVでサーバ側
 - 簡易認証：URL `?key=<APP_KEY>` に一致するときのみ読み書き可
 - 初回ロードでKVから取得 → 変更時1秒debounceでKVに保存
 - オフライン時は localStorage にフォールバック
+- **マルチプロジェクト対応**：複数プロジェクトを切替・作成・削除可能
+- **フルCRUD**：タスク追加・編集・削除・サブタスク・依存関係・マイルストーン
+- **ガントのドラッグ操作**：Macではマウス、iPhoneではタッチでバー移動・両端リサイズ
 
 ## ファイル
 
@@ -19,7 +22,10 @@ Mac/iPhoneで同じデータを使えるToDoアプリ。Vercel KVでサーバ側
 | `api/state.js` | Vercelサーバレス関数（GET/POST + KVアクセス） |
 | `sync.js` | フロントの同期クライアント |
 | `data.js` | 初期データ・ユーティリティ |
-| `app-*.jsx`, `iphone-app.jsx`, `ios-frame.jsx` | UIコンポーネント |
+| `editor.jsx` | プロジェクト切替・タスク編集モーダル・確認ダイアログ |
+| `app-real.jsx` | デスクトップ版アプリ |
+| `iphone-app.jsx` | iPhone/モバイル版アプリ |
+| `app-*.jsx`, `ios-frame.jsx` | （旧）デザイン比較用コンポーネント |
 | `vercel.json` | Vercel設定 |
 | `package.json` | Node version指定 |
 
@@ -68,8 +74,11 @@ gh repo create todo-app --private --source=. --push
 
 ### 7. アクセス
 - URL: `https://<your-app>.vercel.app/?key=mySecret_2026!`
-- 初回はサンプルデータ（健康習慣・副業ローンチ・暮らし）が表示される
-- タスクの進捗・スケジュールを変更すると、右上に「保存中…」→「同期済み」と表示
+- 初回起動時は空のプロジェクト「マイプロジェクト」が作成される
+- 上部のプロジェクト名をクリック → 切替・新規作成・名前変更・削除
+- 「+ タスク追加」「+ マイルストーン」で要素を追加
+- タスクをクリックで編集モーダル
+- 変更すると右上に「保存中…」→「同期済み」と表示
 
 ### 8. iPhone Safariで「ホーム画面に追加」
 1. SafariでURLを開く（keyパラメータ付き）
